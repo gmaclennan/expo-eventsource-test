@@ -2,60 +2,35 @@ import React from "react";
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, Text, View } from "react-native";
 import { fetch } from "expo/fetch";
+import { createEventSource } from "eventsource-client";
 
 export default function App() {
-  const [lcState, setLcState] = React.useState({ status: "loading" });
-  const [urlState, setUrlState] = React.useState({ status: "loading" });
+  const [state, setState] = React.useState();
 
   React.useEffect(() => {
-    fetch("https://httpbin.org/json", { method: "get" })
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.text();
-      })
-      .then((data) => {
-        console.log("Response data:", data);
-        setLcState({ status: "success", data });
-      })
-      .catch((error) => {
-        console.error("Fetch error:", error);
-        setLcState({ status: "error", error });
-      });
-  }, []);
-
-  React.useEffect(() => {
-    fetch(new URL("https://httpbin.org/get"))
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.text();
-      })
-      .then((data) => {
-        console.log("Response data:", data);
-        setUrlState({ status: "success", data });
-      })
-      .catch((error) => {
-        console.error("Fetch error:", error);
-        setUrlState({ status: "error", error });
-      });
+    const es = createEventSource({
+      url: "https://stream.wikimedia.org/v2/stream/recentchange",
+      fetch,
+      onMessage: ({ data }) => {
+        console.log("Received data:", data);
+        setState(data);
+      },
+      onScheduleReconnect: (info) => {
+        console.log("Reconnecting in", info.delay, "ms");
+      },
+      method: "GET",
+      headers: {
+        "User-Agent": "Expo Fetch Test App",
+      },
+    });
+    return () => {
+      es.close();
+    };
   }, []);
 
   return (
     <View style={styles.container}>
-      <Text>Fetch lowercase method: {lcState.status}</Text>
-
-      {lcState.status === "error" && (
-        <Text>Error: {lcState.error.message}</Text>
-      )}
-
-      <Text>Fetch URL method: {urlState.status}</Text>
-
-      {urlState.status === "error" && (
-        <Text>Error: {urlState.error.message}</Text>
-      )}
+      <Text>{state}</Text>
       <StatusBar style="auto" />
     </View>
   );
